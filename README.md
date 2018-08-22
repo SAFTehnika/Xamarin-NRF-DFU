@@ -9,7 +9,7 @@ Simple plugin for Xamarin forms which supports Secure DFU update.
 - Bluetooth LE plugin by aritchie https://github.com/aritchie/bluetoothle
 - Nordic semiconductor device
 ## Features
- - Upload firmware for NordicSemiconductor devices supporting Buttonless DFU without bonds
+ - Upload firmware for NordicSemiconductor devices supporting Buttonless Secure DFU without bonds
 
 ## Usage
 Include
