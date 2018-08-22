@@ -66,6 +66,7 @@ Run [**device** is ***IDevice*** from bluetoothle]. Start command accepts Two st
 
  - [ ] Nuget package
  - [ ] Other firmware upgrade possibilities. Other than buttonless without bonds
+ - [ ] Device advertised names now should be unique while updating DFU. Should add device name change for buttonless dfu.
 
 ## License
  > MIT
