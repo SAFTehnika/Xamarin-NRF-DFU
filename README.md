@@ -1,6 +1,8 @@
 
 # Xamarin-NRF-DFU
 
+![](https://img.shields.io/github/license/mashape/apistatus.svg)
+
 Simple plugin for Xamarin forms which supports Secure DFU update.
 ## Platforms
 
