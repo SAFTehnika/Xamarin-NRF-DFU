@@ -1,3 +1,4 @@
+
 # Xamarin-NRF-DFU
 
 Simple plugin for Xamarin forms which supports Secure DFU update.
@@ -18,7 +19,7 @@ Include
     using Plugin.XamarinNordicDFU;
 Initialize
     
-    dfu = new DFU(true);
+    var dfu = new DFU();
     DFUEvents.OnFimwareProgressChanged = (float progress, TimeSpan elapsed) =>
     {
     
@@ -40,7 +41,7 @@ Initialize
     
     };
 
-Run
+Run [**device** is ***IDevice*** from bluetoothle]. Start command accepts Two streams - fimware stream **xxx.bin** and init packet stream **xxx.dat**. These files are usually found in distribution **.zip** package what can be created using **nrfutil** [More info about distribution packages](https://devzone.nordicsemi.com/b/blog/posts/creating-zip-package-for-dfu)
 
     var assembly = System.Reflection.Assembly.GetExecutingAssembly();
 
@@ -57,12 +58,13 @@ Run
     Stream FirmwarePacket = assembly.GetManifestResourceStream(firmwarePacketPath);
     Stream InitPacket = assembly.GetManifestResourceStream(initPacketPath);
                 
-    await dfu.Start(Device.DeviceObject, FirmwarePacket, InitPacket);
+    await dfu.Start(device, FirmwarePacket, InitPacket);
 
 ## TODO
 
- * Nuget package
- * Other firmware upgrade possibilities. Other than buttonless without bonds
+ - [ ] Nuget package
+ - [ ] Other firmware upgrade possibilities. Other than buttonless without bonds
+
 ## License
  > MIT
- 
+## Contributors
