@@ -3,7 +3,7 @@
 
 ![](https://img.shields.io/github/license/mashape/apistatus.svg)
 
-Simple plugin for Xamarin forms which supports Secure DFU update.
+Simple plugin for Xamarin forms which supports Secure DFU OTA Bluetooth update.
 ## Platforms
 
  > iOS, Android, and basically any other what is supported by aritchie BLE plugin
