@@ -1,14 +1,12 @@
 ﻿// Copyright (c) 2018 SAF Tehnika. All rights reserved. See License.txt in the project root for license information.
 
 using System;
+using System.Diagnostics;
+using System.Linq;
+using System.Reactive.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Plugin.BluetoothLE;
-using System.Diagnostics;
-using System.Reactive.Linq;
-using System.Reactive.Threading.Tasks;
-using System.Threading;
-using System.Text;
-using System.Linq;
 
 namespace Plugin.XamarinNordicDFU
 {
@@ -29,13 +27,13 @@ namespace Plugin.XamarinNordicDFU
             Debug.WriteLineIf(LogLevelDebug, String.Format("Start of Buttonless switching"));
 
             //await RefreshGattAsync(device);
-            
+
             IGattCharacteristic buttonlessCharacteristic = null;
             TaskCompletionSource<CharacteristicGattResult> notif = null;
 
             device.Connect();
             device = await device.ConnectWait().Timeout(DeviceConnectionTimeout);
-                    
+
             buttonlessCharacteristic = await device.GetKnownCharacteristics(DfuService, DfuButtonlessCharacteristicWithoutBonds).Timeout(OperationTimeout);
             await buttonlessCharacteristic.EnableNotifications(true).Timeout(OperationTimeout);
 
@@ -79,19 +77,17 @@ namespace Plugin.XamarinNordicDFU
                 throw new Exception("Init status not correct " + status);
             }
 
-            
             bool alreadyRestarted = false;
             IDisposable dispose = null;
             dispose = device.WhenStatusChanged().Subscribe(res =>
             {
-                if(res == ConnectionStatus.Disconnected || res == ConnectionStatus.Disconnecting)
+                if (res == ConnectionStatus.Disconnected || res == ConnectionStatus.Disconnecting)
                 {
                     alreadyRestarted = true;
                 }
                 Debug.WriteLine("###################### STAT {0}", res);
             });
-            
-            
+
             dispose?.Dispose();
             if (!alreadyRestarted)
             {
@@ -106,14 +102,15 @@ namespace Plugin.XamarinNordicDFU
         }
         private async Task<IDevice> ScanDFUDevice(IDevice device, string newName)
         {
-            
+
             IDevice newDevice = null;
             IDisposable scanner = null;
             bool DeviceFound = false;
             object locked = new object();
             var tcs = new TaskCompletionSource<bool>();
 
-            Task task = Task.Delay(DeviceRestartTimeout).ContinueWith(t => {
+            Task task = Task.Delay(DeviceRestartTimeout).ContinueWith(t =>
+            {
                 lock (locked)
                 {
                     if (!DeviceFound)
@@ -127,7 +124,7 @@ namespace Plugin.XamarinNordicDFU
             // Scan new Device which is (MAC adress + 1)
             scanner = CrossBleAdapter.Current.Scan().Subscribe(scanResult =>
             {
-                Debug.WriteLineIf(LogLevelDebug, String.Format("Scanned device: Name: |{0}:{1}| UUID: {2} preuid: {3}, compareRes: {4}",device.Name, scanResult.Device.Name, scanResult.Device.Uuid,device.Uuid, device.Uuid.CompareTo(scanResult.Device.Uuid)));
+                Debug.WriteLineIf(LogLevelDebug, String.Format("Scanned device: Name: |{0}:{1}| UUID: {2} preuid: {3}, compareRes: {4}", device.Name, scanResult.Device.Name, scanResult.Device.Uuid, device.Uuid, device.Uuid.CompareTo(scanResult.Device.Uuid)));
                 // If name is the same but id is different, should be our device
                 if (newName == scanResult.Device.Name)
                 {

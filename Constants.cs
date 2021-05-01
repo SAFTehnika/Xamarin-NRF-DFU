@@ -1,6 +1,7 @@
 ﻿// Copyright (c) 2018 SAF Tehnika. All rights reserved. See License.txt in the project root for license information.
 
 using System;
+
 namespace Plugin.XamarinNordicDFU
 {
     partial class DFU

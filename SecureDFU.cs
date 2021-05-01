@@ -1,11 +1,12 @@
 ﻿// Copyright (c) 2018 SAF Tehnika. All rights reserved. See License.txt in the project root for license information.
 
 using System;
+using System.Diagnostics;
+using System.IO;
+using System.Reactive.Linq;
 using System.Threading.Tasks;
 using Plugin.BluetoothLE;
-using System.Diagnostics;
-using System.Reactive.Linq;
-using System.IO;
+
 namespace Plugin.XamarinNordicDFU
 {
     partial class DFU
@@ -33,7 +34,8 @@ namespace Plugin.XamarinNordicDFU
             controlPoint = await device.GetKnownCharacteristics(DfuService, SecureDFUControlPointCharacteristic).Timeout(OperationTimeout);
             packetPoint = await device.GetKnownCharacteristics(DfuService, SecureDFUPacketCharacteristic).Timeout(OperationTimeout);
             await controlPoint.EnableNotifications(true);
-            try {
+            try
+            {
                 await SendInitPacket(device, InitPacket, controlPoint, packetPoint);
                 await SendFirmware(device, FirmwarePacket, controlPoint, packetPoint);
             }
@@ -76,7 +78,7 @@ namespace Plugin.XamarinNordicDFU
             ObjectInfo info = await SelectCommand(controlPoint, SecureDFUSelectCommandType.CommmandObject);
 
             bool resumeSendingInitPacket = false;
-            
+
             if (info.offset > 0 && info.offset <= imageSize)
             {
                 // Check if remote sent content is valid
@@ -118,7 +120,7 @@ namespace Plugin.XamarinNordicDFU
                     // Allocate new object
                     await CreateCommand(controlPoint, SecureDFUCreateCommandType.CommmandObject, imageSize);
                 }
-                await TransferData(packetPoint, crc, file, offsetStart: info.offset, MTU:MTU, offsetEnd: imageSize);
+                await TransferData(packetPoint, crc, file, offsetStart: info.offset, MTU: MTU, offsetEnd: imageSize);
 
                 ObjectChecksum check = await ReadChecksum(controlPoint);
                 info.offset = check.offset;
@@ -175,13 +177,13 @@ namespace Plugin.XamarinNordicDFU
 
             ObjectInfo info = await SelectCommand(controlPoint, SecureDFUSelectCommandType.DataObject);
             int objectSize = info.maxSize;// Use maximum available object size
-            
+
             Debug.WriteLineIf(LogLevelDebug, String.Format("Data object info received (Max size = {0}, Offset = {1}, CRC = {2})", objectSize, info.offset, info.CRC32));
-            
+
             CRC32 crc = new CRC32();
-            
+
             await SetPRN(controlPoint, prn);
-            
+
             // Try to allocate first object
             int startAllocatedSize = (int)(firmwareSize - info.offset);
             startAllocatedSize = Math.Min(startAllocatedSize, objectSize);
@@ -189,7 +191,7 @@ namespace Plugin.XamarinNordicDFU
             {
                 await CreateCommand(controlPoint, SecureDFUCreateCommandType.DataObject, startAllocatedSize);
             }
-            
+
             IDisposable dispose = null;
             var LastOffsetFailed = 0;
             var LastOffsetFailCount = 0;
@@ -202,7 +204,7 @@ namespace Plugin.XamarinNordicDFU
                     {
                         lastData = result.Data;
                         Debug.WriteLineIf(LogLevelDebug, String.Format("Notification {0}", BitConverter.ToString(result.Data)));
-                        if(result.Data.Length == 11)
+                        if (result.Data.Length == 11)
                         {
                             ObjectChecksum checks = new ObjectChecksum();
                             SetChecksum(checks, result.Data);
@@ -233,7 +235,8 @@ namespace Plugin.XamarinNordicDFU
                     Debug.WriteLineIf(LogLevelDebug, String.Format("{0} ::: Written bytes {1}, progress: {2}, elapsed: {3}", DateTime.Now.ToString("HH:mm:ss.ffffff"), bytesWritten, objectOffset / (float)firmwareSize, DateTime.Now - DFUStartTime));
                 }
                 // if PRN with correct offset not received, force to calculate CRC and offset
-                if (info.offset != objectOffset) {
+                if (info.offset != objectOffset)
+                {
                     Debug.WriteLineIf(LogLevelDebug, String.Format("{0} ::: Force chekcsum calc", DateTime.Now.ToString("HH:mm:ss.ffffff")));
                     ObjectChecksum check = await ReadChecksum(controlPoint);
                     info.CRC32 = check.CRC32;
@@ -245,7 +248,7 @@ namespace Plugin.XamarinNordicDFU
                 uint remotecrc = (uint)info.CRC32;
                 if (localcrc == remotecrc)
                 {
-                    await ExecuteCommand(controlPoint, skipRegistring:true);
+                    await ExecuteCommand(controlPoint, skipRegistring: true);
                     if (firmwareSize == info.offset)
                     {
                         // Firmware upload finished
@@ -279,17 +282,17 @@ namespace Plugin.XamarinNordicDFU
                     crc.Reset();
                     if (currentStartOffset > 0)
                     {
-                        file.Read(crcBuffer,0, crcBuffer.Length);
+                        file.Read(crcBuffer, 0, crcBuffer.Length);
 
                         crc.Update(crcBuffer);
                     }
-                    if(LastOffsetFailed != currentStartOffset)
+                    if (LastOffsetFailed != currentStartOffset)
                     {
                         LastOffsetFailed = currentStartOffset;
                         LastOffsetFailCount = 0;
                     }
                     LastOffsetFailCount++;
-                    if(LastOffsetFailCount == MaxRetries)
+                    if (LastOffsetFailCount == MaxRetries)
                     {
                         throw new Exception("Too much retries for one object");
                     }

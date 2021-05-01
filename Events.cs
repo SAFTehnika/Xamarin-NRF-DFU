@@ -1,12 +1,6 @@
 ﻿// Copyright (c) 2018 SAF Tehnika. All rights reserved. See License.txt in the project root for license information.
 
 using System;
-using System.Threading.Tasks;
-using Plugin.BluetoothLE;
-using System.Diagnostics;
-using System.Reactive.Linq;
-using System.IO;
-using System.Collections.Generic;
 
 namespace Plugin.XamarinNordicDFU
 {

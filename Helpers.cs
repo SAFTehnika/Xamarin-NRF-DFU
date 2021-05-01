@@ -1,12 +1,11 @@
 ﻿// Copyright (c) 2018 SAF Tehnika. All rights reserved. See License.txt in the project root for license information.
 
 using System;
+using System.Diagnostics;
+using System.IO;
+using System.Reactive.Linq;
 using System.Threading.Tasks;
 using Plugin.BluetoothLE;
-using System.Diagnostics;
-using System.Reactive.Linq;
-using System.IO;
-using System.Collections.Generic;
 
 namespace Plugin.XamarinNordicDFU
 {
@@ -20,16 +19,16 @@ namespace Plugin.XamarinNordicDFU
         private void AssertSuccess(CharacteristicGattResult result)
         {
             /*
-			* The response received from the DFU device contains:
-			* +---------+--------+----------------------------------------------------+
-			* | byte no | value  | description                                        |
-			* +---------+--------+----------------------------------------------------+
-			* | 0       | 0x60   | Response code                                      |
-			* | 1       | 0x06   | The Op Code of a request that this response is for |
-			* | 2       | STATUS | Status code                                        |
+            * The response received from the DFU device contains:
+            * +---------+--------+----------------------------------------------------+
+            * | byte no | value  | description                                        |
+            * +---------+--------+----------------------------------------------------+
+            * | 0       | 0x60   | Response code                                      |
+            * | 1       | 0x06   | The Op Code of a request that this response is for |
+            * | 2       | STATUS | Status code                                        |
             * | ...     | ...    | ...                                                |
-			* +---------+--------+----------------------------------------------------+
-			*/
+            * +---------+--------+----------------------------------------------------+
+            */
             if (result.Data[2] != SecureDFUCommandSuccess)
             {
                 InvokeError(result);
@@ -112,7 +111,7 @@ namespace Plugin.XamarinNordicDFU
             await controlPoint.Write(data).Timeout(OperationTimeout);
 
             var result = await notif.Task;
-            
+
             Debug.WriteLineIf(LogLevelDebug, String.Format("Received PRN set response: {0}", BitConverter.ToString(result.Data)));
 
             AssertSuccess(result);
@@ -135,7 +134,7 @@ namespace Plugin.XamarinNordicDFU
                 0
             };
             SetUInt32LSB(data, 2, size);
-            
+
             var notif = GetTimedNotification(controlPoint);
             await controlPoint.Write(data).Timeout(OperationTimeout);
             var result = await notif.Task;
@@ -154,9 +153,9 @@ namespace Plugin.XamarinNordicDFU
         {
             ObjectInfo info = new ObjectInfo();
             var tcs = new TaskCompletionSource<bool>();
-            
+
             var notif = GetTimedNotification(controlPoint);
-            
+
             await controlPoint.Write(new byte[] { SelectCommandPrefix, (byte)command }).Timeout(OperationTimeout);
 
             var result = await notif.Task;
@@ -189,7 +188,7 @@ namespace Plugin.XamarinNordicDFU
         {
             Debug.WriteLineIf(LogLevelDebug, String.Format("Begin read checksum"));
             ObjectChecksum checksum = new ObjectChecksum();
-            
+
             CharacteristicGattResult result = null;
             for (var retry = 0; retry < MaxRetries; retry++)
             {
@@ -209,7 +208,7 @@ namespace Plugin.XamarinNordicDFU
                 }
                 finally
                 {
-                    if(retry == MaxRetries)
+                    if (retry == MaxRetries)
                     {
                         throw new DFUTimeout();
                     }
@@ -244,16 +243,16 @@ namespace Plugin.XamarinNordicDFU
                 int MAX_READ_BYTES = MTU - RESERVED_BYTES;
                 Debug.WriteLineIf(LogLevelDebug, String.Format("Start of data transfer flen: {0}", file.Length));
                 file.Seek(offsetStart, SeekOrigin.Begin);
-                
+
                 byte[] data = new byte[MAX_READ_BYTES];
-                
-                for (int packetsSent = 0, offset = offsetStart; ; )
+
+                for (int packetsSent = 0, offset = offsetStart; ;)
                 {
                     int bytesToRead = MAX_READ_BYTES;
-                    if(offsetEnd > -1)
+                    if (offsetEnd > -1)
                     {
                         int endOffsetDiff = offsetEnd - offset;
-                        if(endOffsetDiff <= 0)
+                        if (endOffsetDiff <= 0)
                         {
                             break;
                         }
@@ -303,7 +302,7 @@ namespace Plugin.XamarinNordicDFU
         /// </summary>
         /// <param name="device"></param>
         /// <returns></returns>
-        private async Task ExecuteCommand(IGattCharacteristic controlPoint,bool skipRegistring = false)
+        private async Task ExecuteCommand(IGattCharacteristic controlPoint, bool skipRegistring = false)
         {
             var notif = GetTimedNotification(controlPoint);
             await controlPoint.Write(CExecute).Timeout(OperationTimeout);
@@ -344,7 +343,8 @@ namespace Plugin.XamarinNordicDFU
             bool notificationReceived = false;
             IDisposable disposable = null;
             object locked = new object();
-            Task task = Task.Delay(OperationTimeout).ContinueWith(t => {
+            Task task = Task.Delay(OperationTimeout).ContinueWith(t =>
+            {
                 lock (locked)
                 {
                     if (!notificationReceived)

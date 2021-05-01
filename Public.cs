@@ -1,21 +1,24 @@
 ﻿// Copyright (c) 2018 SAF Tehnika. All rights reserved. See License.txt in the project root for license information.
 
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using Plugin.BluetoothLE;
-using System.Diagnostics;
+
 namespace Plugin.XamarinNordicDFU
 {
     class ObjectInfo : ObjectChecksum
     {
         public int maxSize;
     }
+
     class ObjectChecksum
     {
         public int offset;
         public int CRC32;
     }
+
     public enum ExtendedErrors
     {
         NRF_DFU_EXT_ERROR_NO_ERROR = 0x00, //No extended error code has been set. This error indicates an implementation problem.
@@ -33,6 +36,7 @@ namespace Plugin.XamarinNordicDFU
         NRF_DFU_EXT_ERROR_VERIFICATION_FAILED = 0x0C, //The hash of the received firmware image does not match the hash in the init packet.
         NRF_DFU_EXT_ERROR_INSUFFICIENT_SPACE = 0x0D //The available space on the device is insufficient to hold the firmware.
     }
+
     public enum ResponseErrors
     {
         NRF_DFU_RES_CODE_INVALID = 0x00,//Invalid opcode.
@@ -46,14 +50,14 @@ namespace Plugin.XamarinNordicDFU
         NRF_DFU_RES_CODE_OPERATION_FAILED = 0x0A,//Operation failed.
         NRF_DFU_RES_CODE_EXT_ERROR = 0x0B,//Extended error.The next byte of the response contains the error code of the extended error(see nrf_dfu_ext_error_code_t).
     }
+
     public enum GlobalErrors
     {
         FILE_STREAMS_NOT_SUPPLIED = 0x00
     }
+
     partial class DFU
     {
-        
-
         /// <summary>
         /// Debug logs in Debug configuration enabled or disabled
         /// </summary>
@@ -80,11 +84,11 @@ namespace Plugin.XamarinNordicDFU
                 await RunSecureDFU(newDevice, FirmwarePacket, InitPacket);
                 DFUEvents.OnSuccess?.Invoke(DateTime.Now - DFUStartTime);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 DFUEvents.OnError?.Invoke(ex.ToString());
                 Debug.WriteLineIf(LogLevelDebug, ex.StackTrace);
-                
+
                 newDevice?.CancelConnection();
                 device?.CancelConnection();
             }
