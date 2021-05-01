@@ -23,10 +23,7 @@ namespace Plugin.XamarinNordicDFU
             IGattCharacteristic controlPoint = null;
             IGattCharacteristic packetPoint = null;
 
-            //await RefreshGattAsync(device);
-
-            device.Connect();
-            await device.ConnectWait().Timeout(DeviceConnectionTimeout);
+            await device.ConnectWait(new ConnectionConfig { AutoConnect = false }).Timeout(DeviceConnectionTimeout);
 
             // Request MTU only once
             await device.RequestMtu(256).Timeout(OperationTimeout);

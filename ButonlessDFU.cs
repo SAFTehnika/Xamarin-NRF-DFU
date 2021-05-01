@@ -26,13 +26,10 @@ namespace Plugin.XamarinNordicDFU
         {
             Debug.WriteLineIf(LogLevelDebug, String.Format("Start of Buttonless switching"));
 
-            //await RefreshGattAsync(device);
-
             IGattCharacteristic buttonlessCharacteristic = null;
             TaskCompletionSource<CharacteristicGattResult> notif = null;
 
-            device.Connect();
-            device = await device.ConnectWait().Timeout(DeviceConnectionTimeout);
+            device = await device.ConnectWait(new ConnectionConfig { AutoConnect = false }).Timeout(DeviceConnectionTimeout);
 
             buttonlessCharacteristic = await device.GetKnownCharacteristics(DfuService, DfuButtonlessCharacteristicWithoutBonds).Timeout(OperationTimeout);
             await buttonlessCharacteristic.EnableNotifications(true).Timeout(OperationTimeout);
