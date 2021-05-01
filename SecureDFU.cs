@@ -4,6 +4,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Reactive.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Plugin.BluetoothLE;
 
@@ -25,7 +26,12 @@ namespace Plugin.XamarinNordicDFU
 
             await device.ConnectWait(new ConnectionConfig { AutoConnect = false }).Timeout(DeviceConnectionTimeout);
 
-            // Request MTU only once
+            // Important notice:
+            // iOS doesn't provide API to request MTU and RequestMtu method just returns auto-negotiated value for CBCharacteristicWriteType.WithResponse
+            // RequestMtu https://github.com/aritchie/bluetoothle/blob/ce41a59153c88654e64ff740c1e14460c64b55dd/Plugin.BluetoothLE/AbstractDevice.cs#L34
+            // MtuSize https://github.com/aritchie/bluetoothle/blob/ce41a59153c88654e64ff740c1e14460c64b55dd/Plugin.BluetoothLE/Platforms/iOS/Device.cs#L12
+            // On iOS 13 and above, MTU size is different for CBCharacteristicWriteType.WithResponse & CBCharacteristicWriteType.WithoutResponse.
+            // Using the wrong MTU was actually the cause of the nasty bug, when sending data got stuck and ReadChecksum timeout occurred.
             await device.RequestMtu(256).Timeout(OperationTimeout);
 
             controlPoint = await device.GetKnownCharacteristics(DfuService, SecureDFUControlPointCharacteristic).Timeout(OperationTimeout);
@@ -36,9 +42,9 @@ namespace Plugin.XamarinNordicDFU
                 await SendInitPacket(device, InitPacket, controlPoint, packetPoint);
                 await SendFirmware(device, FirmwarePacket, controlPoint, packetPoint);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                await Cleanup(controlPoint, device);
+                Debug.WriteLineIf(LogLevelDebug, ex);
                 throw;
             }
             finally
@@ -65,11 +71,12 @@ namespace Plugin.XamarinNordicDFU
         /// <returns></returns>
         private async Task SendInitPacket(IDevice device, Stream InitPacket, IGattCharacteristic controlPoint, IGattCharacteristic packetPoint)
         {
+            DFUEvents.OnLogMessage?.Invoke("Transfer of an init packet");
             Debug.WriteLineIf(LogLevelDebug, "Start of init packet send");
-            //FileStream file = new FileStream(InitFilePath, FileMode.Open, FileAccess.Read);
+
             var file = InitPacket;
             int imageSize = (int)file.Length;// Around ?~ 130bytes 
-            var MTU = Math.Min(device.MtuSize, DFUMaximumMTU);
+            int MTU = Math.Min(device.MtuSize, DFUMaximumMTU);
             CRC32 crc = new CRC32();
 
             ObjectInfo info = await SelectCommand(controlPoint, SecureDFUSelectCommandType.CommmandObject);
@@ -166,11 +173,41 @@ namespace Plugin.XamarinNordicDFU
         /// <returns></returns>
         private async Task SendFirmware(IDevice device, Stream FirmwarePacket, IGattCharacteristic controlPoint, IGattCharacteristic packetPoint)
         {
-            //FileStream file = new FileStream(FirmwareFilePath, FileMode.Open, FileAccess.Read);
+            DFUEvents.OnLogMessage?.Invoke("Transfer of a firmware image");
+
             var file = FirmwarePacket;
             long firmwareSize = file.Length;
-            var MTU = Math.Min(device.MtuSize, DFUMaximumMTU);
+            int MTU = Math.Min(device.MtuSize, DFUMaximumMTU);
             const int prn = 0;
+
+            // A workaround to get correct MTU size on iOS for CBCharacteristicWriteType.WithoutResponse
+            if (Xamarin.Forms.Device.RuntimePlatform == Xamarin.Forms.Device.iOS)
+            {
+                Debug.WriteLineIf(LogLevelDebug, "MTU iOS workaround");
+                try
+                {
+                    PropertyInfo peripheralPropInfo = packetPoint.GetType().GetProperty("Peripheral", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    object peripheral = peripheralPropInfo.GetValue(packetPoint, null); // CoreBluetooth.CBPeripheral
+
+                    MethodInfo mtuMethodInfo = peripheral.GetType().GetMethod("GetMaximumWriteValueLength");
+                    object[] parameters = new object[] { 1 }; // 1 = CBCharacteristicWriteType.WithoutResponse
+                    object result = mtuMethodInfo.Invoke(peripheral, parameters);
+                    Debug.WriteLineIf(LogLevelDebug, $"peripheral.GetMaximumWriteValueLength(CBCharacteristicWriteType.WithoutResponse)={result}");
+
+                    // The actual MTU size is 3 bytes more since that's the overhead for ATT (1 byte for opcode + 2 bytes for handle ID).
+                    int intResult = Convert.ToInt32(result); // nuint => int
+                    intResult += 3;
+
+                    MTU = Math.Min(intResult, DFUMaximumMTU);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLineIf(LogLevelDebug, "MTU iOS workaround Ex: " + ex);
+                    DFUEvents.OnLogMessage?.Invoke("MTU iOS workaround Ex: " + ex.Message);
+                }
+            }
+
+            Debug.WriteLineIf(LogLevelDebug, $"device.MtuSize = {device.MtuSize}, DFUMaximumMTU = {DFUMaximumMTU}, MTU = {MTU}");
 
             ObjectInfo info = await SelectCommand(controlPoint, SecureDFUSelectCommandType.DataObject);
             int objectSize = info.maxSize;// Use maximum available object size
@@ -187,6 +224,7 @@ namespace Plugin.XamarinNordicDFU
             if (startAllocatedSize > 0)
             {
                 await CreateCommand(controlPoint, SecureDFUCreateCommandType.DataObject, startAllocatedSize);
+                await Task.Delay(400); // nRF Connect on iOS performs wait(400) after first Create request
             }
 
             IDisposable dispose = null;
@@ -262,6 +300,8 @@ namespace Plugin.XamarinNordicDFU
                 }
                 else
                 {
+                    Debug.WriteLineIf(LogLevelDebug, $"localcrc != remotecrc {localcrc} {remotecrc}");
+
                     await Task.Delay(1000);
                     // Get current object start offset
                     int allocateSize = objectSize;
@@ -289,7 +329,7 @@ namespace Plugin.XamarinNordicDFU
                         LastOffsetFailCount = 0;
                     }
                     LastOffsetFailCount++;
-                    if (LastOffsetFailCount == MaxRetries)
+                    if (LastOffsetFailCount >= MaxRetries)
                     {
                         throw new Exception("Too much retries for one object");
                     }

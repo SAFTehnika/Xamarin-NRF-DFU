@@ -38,5 +38,10 @@ namespace Plugin.XamarinNordicDFU
         /// </summary>
         public static OnResponseErrorsDelegate OnResponseError = null;
 
+        public delegate void OnLogMessageDelegate(string message);
+        /// <summary>
+        /// DFU process logging
+        /// </summary>
+        public static OnLogMessageDelegate OnLogMessage = null;
     }
 }

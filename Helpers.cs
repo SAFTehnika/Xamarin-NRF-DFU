@@ -208,7 +208,7 @@ namespace Plugin.XamarinNordicDFU
                 }
                 finally
                 {
-                    if (retry == MaxRetries)
+                    if (retry >= MaxRetries)
                     {
                         throw new DFUTimeout();
                     }
@@ -278,7 +278,7 @@ namespace Plugin.XamarinNordicDFU
                     }
 
                     // Specific for iOS, if no timeout, then sending happens to be blocked
-                    await Task.Delay(1);
+                    await Task.Delay(10);
 
                     await packetPoint.WriteWithoutResponse(pending).Timeout(OperationTimeout);
 
