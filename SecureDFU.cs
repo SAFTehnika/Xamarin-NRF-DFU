@@ -178,7 +178,6 @@ namespace Plugin.XamarinNordicDFU
             var file = FirmwarePacket;
             long firmwareSize = file.Length;
             int MTU = Math.Min(device.MtuSize, DFUMaximumMTU);
-            const int prn = 0;
 
             // A workaround to get correct MTU size on iOS for CBCharacteristicWriteType.WithoutResponse
             if (Xamarin.Forms.Device.RuntimePlatform == Xamarin.Forms.Device.iOS)
@@ -209,14 +208,32 @@ namespace Plugin.XamarinNordicDFU
 
             Debug.WriteLineIf(LogLevelDebug, $"device.MtuSize = {device.MtuSize}, DFUMaximumMTU = {DFUMaximumMTU}, MTU = {MTU}");
 
+            await SetPRN(controlPoint, 0);
+            // Packet receipt notification (PRN) is not currently in use, but can be helpful
+            // as a dirty workaround for limiting data transfer rate on some mobile devices:
+            // https://github.com/NordicSemiconductor/IOS-Pods-DFU-Library/issues/308#issuecomment-495106243
+            // https://github.com/NordicSemiconductor/Android-DFU-Library/issues/111
+            // https://github.com/Pilloxa/react-native-nordic-dfu/issues/113
+
+            /* Uncomment this subscription, if you would like to mess around with the PRN :)
+            using var notificationSubscription = controlPoint.WhenNotificationReceived().Subscribe(result =>
+            {
+                Debug.WriteLineIf(LogLevelDebug, $"Notification {result.Data.ToHexString()}");
+                if (result.Data.Length == 11)
+                {
+                    var checksum = new ObjectChecksum();
+                    SetChecksum(checksum, result.Data);
+                    Debug.WriteLineIf(LogLevelDebug, $"{DateTime.Now:HH:mm:ss.fff} ::: PRN response crc: {checksum.CRC32}, offset: {checksum.offset}");
+                }
+            });
+            /* */
+
             ObjectInfo info = await SelectCommand(controlPoint, SecureDFUSelectCommandType.DataObject);
             int objectSize = info.maxSize;// Use maximum available object size
 
             Debug.WriteLineIf(LogLevelDebug, String.Format("Data object info received (Max size = {0}, Offset = {1}, CRC = {2})", objectSize, info.offset, info.CRC32));
 
             CRC32 crc = new CRC32();
-
-            await SetPRN(controlPoint, prn);
 
             // Try to allocate first object
             int startAllocatedSize = (int)(firmwareSize - info.offset);
@@ -227,29 +244,11 @@ namespace Plugin.XamarinNordicDFU
                 await Task.Delay(400); // nRF Connect on iOS performs wait(400) after first Create request
             }
 
-            IDisposable dispose = null;
             var LastOffsetFailed = 0;
             var LastOffsetFailCount = 0;
             // Run till all objects are transferred, object sizes must be page aligned
             while (true)
             {
-                byte[] lastData;
-                dispose = controlPoint.WhenNotificationReceived().Subscribe(
-                    result =>
-                    {
-                        lastData = result.Data;
-                        Debug.WriteLineIf(LogLevelDebug, String.Format("Notification {0}", BitConverter.ToString(result.Data)));
-                        if (result.Data.Length == 11)
-                        {
-                            ObjectChecksum checks = new ObjectChecksum();
-                            SetChecksum(checks, result.Data);
-                            info.offset = checks.offset;
-                            info.CRC32 = checks.CRC32;
-                            Debug.WriteLineIf(LogLevelDebug, String.Format("{0} ::: PRN response check: {1}, offset: {2}", DateTime.Now.ToString("HH:mm:ss.ffffff"), checks.CRC32, checks.offset));
-                        }
-                    }
-                );
-
                 int endOffset = GetCurrentObjectEnd(info.offset, objectSize, firmwareSize);
                 int objectOffset = info.offset;
 
@@ -277,7 +276,6 @@ namespace Plugin.XamarinNordicDFU
                     info.CRC32 = check.CRC32;
                     info.offset = check.offset;
                 }
-                dispose?.Dispose();
 
                 uint localcrc = (uint)crc.Value;
                 uint remotecrc = (uint)info.CRC32;
