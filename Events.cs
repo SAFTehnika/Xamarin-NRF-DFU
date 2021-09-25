@@ -18,21 +18,19 @@ namespace Plugin.XamarinNordicDFU
         /// </summary>
         public static OnProgressChangedDelegate OnFimwareProgressChanged = null;
 
-
         public delegate void OnErrorDelegate(string message);
         /// <summary>
         /// Error that caused transfer to abort, after receiving error transfer is aborted. This may not be the root cause. Check OnExtendedError and OnResponseError events
         /// </summary>
         public static OnErrorDelegate OnError = null;
 
-
-        public delegate void OnExtendedErrorsDelegate(ExtendedErrors error);
+        public delegate void OnExtendedErrorsDelegate(DFUOperationExtendedErrorCode error);
         /// <summary>
         /// Extended error in transfer
         /// </summary>
         public static OnExtendedErrorsDelegate OnExtendedError = null;
 
-        public delegate void OnResponseErrorsDelegate(ResponseErrors error);
+        public delegate void OnResponseErrorsDelegate(DFUOperationResultCode error);
         /// <summary>
         /// Extended error in transfer
         /// </summary>

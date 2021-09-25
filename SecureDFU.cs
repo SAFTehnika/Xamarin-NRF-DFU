@@ -16,13 +16,13 @@ namespace Plugin.XamarinNordicDFU
         /// Run actual filmware upgrade procedure (Secure DFU)
         /// </summary>
         /// <param name="device">Device which is switched to Secure DFU mode</param>
-        /// <param name="FirmwarePath"></param>
-        /// <param name="InitFilePath"></param>
+        /// <param name="FirmwareStream"></param>
+        /// <param name="InitPacketStream"></param>
         /// <returns></returns>
         private async Task RunSecureDFU(IDevice device, Stream FirmwarePacket, Stream InitPacket)
         {
-            IGattCharacteristic controlPoint = null;
-            IGattCharacteristic packetPoint = null;
+            IGattCharacteristic controlPoint;
+            IGattCharacteristic packetPoint;
 
             await device.ConnectWait(new ConnectionConfig { AutoConnect = false }).Timeout(DeviceConnectionTimeout);
 
@@ -52,6 +52,7 @@ namespace Plugin.XamarinNordicDFU
                 await Cleanup(controlPoint, device);
             }
         }
+
         /// <summary>
         /// Close connections, try to reenter standart mode, unsubscribe notifications
         /// </summary>
@@ -61,6 +62,7 @@ namespace Plugin.XamarinNordicDFU
             await controlPoint.DisableNotifications();
             device.CancelConnection();
         }
+
         /// <summary>
         /// Upload Init package (*.dat)
         /// </summary>
@@ -75,11 +77,11 @@ namespace Plugin.XamarinNordicDFU
             Debug.WriteLineIf(LogLevelDebug, "Start of init packet send");
 
             var file = InitPacket;
-            int imageSize = (int)file.Length;// Around ?~ 130bytes 
+            int imageSize = (int)file.Length;// Around ?~ 130bytes
             int MTU = Math.Min(device.MtuSize, DFUMaximumMTU);
             CRC32 crc = new CRC32();
 
-            ObjectInfo info = await SelectCommand(controlPoint, SecureDFUSelectCommandType.CommmandObject);
+            ObjectInfo info = await SelectCommand(controlPoint, SecureDFUObjectType.NRF_DFU_OBJ_TYPE_COMMAND);
 
             bool resumeSendingInitPacket = false;
 
@@ -122,7 +124,7 @@ namespace Plugin.XamarinNordicDFU
                 if (!resumeSendingInitPacket)
                 {
                     // Allocate new object
-                    await CreateCommand(controlPoint, SecureDFUCreateCommandType.CommmandObject, imageSize);
+                    await CreateCommand(controlPoint, SecureDFUObjectType.NRF_DFU_OBJ_TYPE_COMMAND, imageSize);
                 }
                 await TransferData(packetPoint, crc, file, offsetStart: info.offset, MTU: MTU, offsetEnd: imageSize);
 
@@ -163,6 +165,7 @@ namespace Plugin.XamarinNordicDFU
             await ExecuteCommand(controlPoint);
             Debug.WriteLineIf(LogLevelDebug, "End of init packet send");
         }
+
         /// <summary>
         /// Upload Firmware image (*.bin)
         /// </summary>
@@ -208,14 +211,12 @@ namespace Plugin.XamarinNordicDFU
 
             Debug.WriteLineIf(LogLevelDebug, $"device.MtuSize = {device.MtuSize}, DFUMaximumMTU = {DFUMaximumMTU}, MTU = {MTU}");
 
-            await SetPRN(controlPoint, 0);
-            // Packet receipt notification (PRN) is not currently in use, but can be helpful
-            // as a dirty workaround for limiting data transfer rate on some mobile devices:
+            await SetPRN(controlPoint, 0); // Packet receipt notification
+            /*
+            // PRN is not currently in use, but can be helpful as a dirty workaround for limiting data transfer rate on some mobile devices:
             // https://github.com/NordicSemiconductor/IOS-Pods-DFU-Library/issues/308#issuecomment-495106243
             // https://github.com/NordicSemiconductor/Android-DFU-Library/issues/111
             // https://github.com/Pilloxa/react-native-nordic-dfu/issues/113
-
-            /* Uncomment this subscription, if you would like to mess around with the PRN :)
             using var notificationSubscription = controlPoint.WhenNotificationReceived().Subscribe(result =>
             {
                 Debug.WriteLineIf(LogLevelDebug, $"Notification {result.Data.ToHexString()}");
@@ -228,7 +229,7 @@ namespace Plugin.XamarinNordicDFU
             });
             /* */
 
-            ObjectInfo info = await SelectCommand(controlPoint, SecureDFUSelectCommandType.DataObject);
+            ObjectInfo info = await SelectCommand(controlPoint, SecureDFUObjectType.NRF_DFU_OBJ_TYPE_DATA);
             int objectSize = info.maxSize;// Use maximum available object size
 
             Debug.WriteLineIf(LogLevelDebug, String.Format("Data object info received (Max size = {0}, Offset = {1}, CRC = {2})", objectSize, info.offset, info.CRC32));
@@ -240,7 +241,7 @@ namespace Plugin.XamarinNordicDFU
             startAllocatedSize = Math.Min(startAllocatedSize, objectSize);
             if (startAllocatedSize > 0)
             {
-                await CreateCommand(controlPoint, SecureDFUCreateCommandType.DataObject, startAllocatedSize);
+                await CreateCommand(controlPoint, SecureDFUObjectType.NRF_DFU_OBJ_TYPE_DATA, startAllocatedSize);
                 await Task.Delay(400); // nRF Connect on iOS performs wait(400) after first Create request
             }
 
@@ -294,7 +295,7 @@ namespace Plugin.XamarinNordicDFU
                     {
                         allocateSize = (int)(firmwareSize - info.offset);
                     }
-                    await CreateCommand(controlPoint, SecureDFUCreateCommandType.DataObject, allocateSize);
+                    await CreateCommand(controlPoint, SecureDFUObjectType.NRF_DFU_OBJ_TYPE_DATA, allocateSize);
                 }
                 else
                 {
@@ -318,7 +319,6 @@ namespace Plugin.XamarinNordicDFU
                     if (currentStartOffset > 0)
                     {
                         file.Read(crcBuffer, 0, crcBuffer.Length);
-
                         crc.Update(crcBuffer);
                     }
                     if (LastOffsetFailed != currentStartOffset)
@@ -332,7 +332,7 @@ namespace Plugin.XamarinNordicDFU
                         throw new Exception("Too much retries for one object");
                     }
                     // Allocate memory from current object start position
-                    await CreateCommand(controlPoint, SecureDFUCreateCommandType.DataObject, allocateSize);
+                    await CreateCommand(controlPoint, SecureDFUObjectType.NRF_DFU_OBJ_TYPE_DATA, allocateSize);
                 }
             }
         }
